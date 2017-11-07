@@ -96,6 +96,11 @@ func (this *SSHSession) createConnection(user, password, ipPort string) error {
  * @author shenbowei
  */
 func (this *SSHSession) muxShell() error {
+	defer func() {
+		if err := recover(); err != nil {
+			LogError("SSHSession muxShell err:%s", err)
+		}
+	}()
 	modes := ssh.TerminalModes{
 		ssh.ECHO:          1,     // disable echoing
 		ssh.TTY_OP_ISPEED: 14400, // input speed = 14.4kbaud
@@ -116,12 +121,26 @@ func (this *SSHSession) muxShell() error {
 	in := make(chan string, 0)
 	out := make(chan string, 0)
 	go func() {
+		defer func() {
+			if err := recover(); err != nil {
+				LogError("Goroutine muxShell write err:%s", err)
+			}
+		}()
 		for cmd := range in {
-			w.Write([]byte(cmd + "\n"))
+			_, err := w.Write([]byte(cmd + "\n"))
+			if err != nil {
+				LogDebug("Writer write err:%s", err.Error())
+				return
+			}
 		}
 	}()
 
 	go func() {
+		defer func() {
+			if err := recover(); err != nil {
+				LogError("Goroutine muxShell read err:%s", err)
+			}
+		}()
 		var (
 			buf [65 * 1024]byte
 			t   int
@@ -211,6 +230,11 @@ func (this *SSHSession) GetSSHBrand() string {
  * @author shenbowei
  */
 func (this *SSHSession) Close() error {
+	defer func() {
+		if err := recover(); err != nil {
+			LogError("SSHSession Close err:%s", err)
+		}
+	}()
 	if err := this.session.Close(); err != nil {
 		return err
 	}
