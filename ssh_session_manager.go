@@ -21,7 +21,7 @@ var sessionManager = NewSessionManager()
 type SessionManager struct {
 	sessionCache  map[string]*SSHSession
 	sessionLocker map[string]*sync.Mutex
-	globalLocker  *sync.Mutex
+	globalLocker  *sync.RWMutex
 }
 
 /**
@@ -33,10 +33,27 @@ func NewSessionManager() *SessionManager {
 	sessionManager := new(SessionManager)
 	sessionManager.sessionCache = make(map[string]*SSHSession, 0)
 	sessionManager.sessionLocker = make(map[string]*sync.Mutex, 0)
-	sessionManager.globalLocker = new(sync.Mutex)
+	sessionManager.globalLocker = new(sync.RWMutex)
 	//启动自动清理的线程，清理10分钟未使用的session缓存
 	sessionManager.RunAutoClean()
 	return sessionManager
+}
+
+func (this *SessionManager) SetSessionCache(sessionKey string, session *SSHSession) {
+	this.globalLocker.Lock()
+	defer this.globalLocker.Unlock()
+	this.sessionCache[sessionKey] = session
+}
+
+func (this *SessionManager) GetSessionCache(sessionKey string) *SSHSession {
+	this.globalLocker.RLock()
+	defer this.globalLocker.RUnlock()
+	cache, ok := this.sessionCache[sessionKey]
+	if ok {
+		return cache
+	} else {
+		return nil
+	}
 }
 
 /**
@@ -80,7 +97,7 @@ func (this *SessionManager) updateSession(user, password, ipPort, brand string) 
 	//初始化session，包括等待登录输出和禁用分页
 	this.initSession(mySession, brand)
 	//更新session的缓存
-	this.sessionCache[sessionKey] = mySession
+	this.SetSessionCache(sessionKey, mySession)
 	return nil
 }
 
@@ -118,8 +135,8 @@ func (this *SessionManager) initSession(session *SSHSession, brand string) {
  */
 func (this *SessionManager) GetSession(user, password, ipPort, brand string) (*SSHSession, error) {
 	sessionKey := user + "_" + password + "_" + ipPort
-	session, ok := this.sessionCache[sessionKey]
-	if ok {
+	session := this.GetSessionCache(sessionKey)
+	if session != nil {
 		//返回前要验证是否可用，不可用要重新创建并更新缓存
 		if session.CheckSelf() {
 			session.UpdateLastUseTime()
@@ -130,7 +147,7 @@ func (this *SessionManager) GetSession(user, password, ipPort, brand string) (*S
 	if err := this.updateSession(user, password, ipPort, brand); err != nil {
 		return nil, err
 	} else {
-		return this.sessionCache[sessionKey], nil
+		return this.GetSessionCache(sessionKey), nil
 	}
 }
 
@@ -144,7 +161,9 @@ func (this *SessionManager) RunAutoClean() {
 			timeoutSessionIndex := this.getTimeoutSessionIndex()
 			this.globalLocker.Lock()
 			for _, sessionKey := range timeoutSessionIndex {
+				this.LockSession(sessionKey)
 				delete(this.sessionCache, sessionKey)
+				this.UnlockSession(sessionKey)
 			}
 			this.globalLocker.Unlock()
 			time.Sleep(time.Second)
@@ -158,12 +177,14 @@ func (this *SessionManager) RunAutoClean() {
  * @author shenbowei
  */
 func (this *SessionManager) getTimeoutSessionIndex() []string {
+	timeoutSessionIndex := make([]string, 0)
+	this.globalLocker.RLock()
 	defer func() {
+		this.globalLocker.RUnlock()
 		if err := recover(); err != nil {
 			LogError("SSHSessionManager getTimeoutSessionIndex err:%s", err)
 		}
 	}()
-	timeoutSessionIndex := make([]string, 0)
 	for sessionKey, SSHSession := range this.sessionCache {
 		timeDuratime := time.Now().Sub(SSHSession.GetLastUseTime())
 		if timeDuratime.Minutes() > 10 {
