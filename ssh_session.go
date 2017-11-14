@@ -75,7 +75,10 @@ func (this *SSHSession) createConnection(user, password, ipPort string) error {
 			return nil
 		},
 		Config: ssh.Config{
-			Ciphers: []string{"aes128-cbc"},
+			Ciphers: []string{"aes128-ctr", "aes192-ctr", "aes256-ctr",
+				"aes128-gcm@openssh.com", "arcfour256", "arcfour128",
+				"aes128-cbc", "aes256-cbc", "3des-cbc", "des-cbc",
+			},
 		},
 	})
 	if err != nil {
