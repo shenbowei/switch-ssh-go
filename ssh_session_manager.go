@@ -92,6 +92,7 @@ func (this *SessionManager) updateSession(user, password, ipPort, brand string) 
 	sessionKey := user + "_" + password + "_" + ipPort
 	mySession, err := NewSSHSession(user, password, ipPort)
 	if err != nil {
+		LogError("NewSSHSession err:%s", err.Error())
 		return err
 	}
 	//初始化session，包括等待登录输出和禁用分页
@@ -139,12 +140,15 @@ func (this *SessionManager) GetSession(user, password, ipPort, brand string) (*S
 	if session != nil {
 		//返回前要验证是否可用，不可用要重新创建并更新缓存
 		if session.CheckSelf() {
+			LogDebug("-----GetSession from cache-----")
 			session.UpdateLastUseTime()
 			return session, nil
 		}
+		LogDebug("Check session failed")
 	}
 	//如果不存在或者验证失败，需要重新连接，并更新缓存
 	if err := this.updateSession(user, password, ipPort, brand); err != nil {
+		LogError("SSH session pool updateSession err:%s", err.Error())
 		return nil, err
 	} else {
 		return this.GetSessionCache(sessionKey), nil
@@ -188,6 +192,7 @@ func (this *SessionManager) getTimeoutSessionIndex() []string {
 	for sessionKey, SSHSession := range this.sessionCache {
 		timeDuratime := time.Now().Sub(SSHSession.GetLastUseTime())
 		if timeDuratime.Minutes() > 10 {
+			LogDebug("RunAutoClean close session<%s, unuse time=%s>", sessionKey, timeDuratime.String())
 			SSHSession.Close()
 			timeoutSessionIndex = append(timeoutSessionIndex, sessionKey)
 		}

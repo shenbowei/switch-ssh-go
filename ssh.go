@@ -1,8 +1,8 @@
 package ssh
 
 import (
-	"strings"
 	"fmt"
+	"strings"
 )
 
 const (
@@ -24,6 +24,7 @@ func RunCommands(user, password, ipPort string, cmds ...string) (string, error) 
 
 	sshSession, err := sessionManager.GetSession(user, password, ipPort, "")
 	if err != nil {
+		LogError("GetSession error:%s", err)
 		return "", err
 	}
 	sshSession.WriteChannel(cmds...)
@@ -45,6 +46,7 @@ func RunCommandsWithBrand(user, password, ipPort, brand string, cmds ...string) 
 
 	sshSession, err := sessionManager.GetSession(user, password, ipPort, brand)
 	if err != nil {
+		LogError("GetSession error:%s", err)
 		return "", err
 	}
 	sshSession.WriteChannel(cmds...)
@@ -66,6 +68,7 @@ func GetSSHBrand(user, password, ipPort string) (string, error) {
 
 	sshSession, err := sessionManager.GetSession(user, password, ipPort, "")
 	if err != nil {
+		LogError("GetSession error:%s", err)
 		return "", err
 	}
 	return sshSession.GetSSHBrand(), nil
@@ -94,6 +97,7 @@ func filterResult(result, firstCmd string) string {
 			promptStr = resultItem[0:strings.Index(resultItem, firstCmd)]
 			promptStr = strings.Replace(promptStr, "\r", "", -1)
 			promptStr = strings.TrimSpace(promptStr)
+			LogDebug("Find promptStr='%s'", promptStr)
 			//将命令添加到结果中
 			filteredResult += resultItem + "\n"
 		}

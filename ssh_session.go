@@ -29,12 +29,15 @@ type SSHSession struct {
 func NewSSHSession(user, password, ipPort string) (*SSHSession, error) {
 	sshSession := new(SSHSession)
 	if err := sshSession.createConnection(user, password, ipPort); err != nil {
+		LogError("NewSSHSession createConnection error:%s", err.Error())
 		return nil, err
 	}
 	if err := sshSession.muxShell(); err != nil {
+		LogError("NewSSHSession muxShell error:%s", err.Error())
 		return nil, err
 	}
 	if err := sshSession.start(); err != nil {
+		LogError("NewSSHSession start error:%s", err.Error())
 		return nil, err
 	}
 	sshSession.lastUseTime = time.Now()
@@ -66,6 +69,7 @@ func (this *SSHSession) UpdateLastUseTime() {
  * @author shenbowei
  */
 func (this *SSHSession) createConnection(user, password, ipPort string) error {
+	LogDebug("<Test> Begin connect")
 	client, err := ssh.Dial("tcp", ipPort, &ssh.ClientConfig{
 		User: user,
 		Auth: []ssh.AuthMethod{
@@ -74,22 +78,26 @@ func (this *SSHSession) createConnection(user, password, ipPort string) error {
 		HostKeyCallback: func(hostname string, remote net.Addr, key ssh.PublicKey) error {
 			return nil
 		},
+		Timeout: 20 * time.Second,
 		Config: ssh.Config{
-			Ciphers: []string{"aes128-ctr", "aes192-ctr", "aes256-ctr",
-				"aes128-gcm@openssh.com", "arcfour256", "arcfour128",
-				"aes128-cbc", "aes256-cbc", "3des-cbc", "des-cbc",
+			Ciphers: []string{"aes128-ctr", "aes192-ctr", "aes256-ctr", "aes128-gcm@openssh.com",
+				"arcfour256", "arcfour128", "aes128-cbc", "aes256-cbc", "3des-cbc", "des-cbc",
 			},
 		},
 	})
 	if err != nil {
+		LogError("SSH Dial err:%s", err.Error())
 		return err
 	}
-
+	LogDebug("<Test> End connect")
+	LogDebug("<Test> Begin new session")
 	session, err := client.NewSession()
 	if err != nil {
+		LogError("NewSession err:%s", err.Error())
 		return err
 	}
 	this.session = session
+	LogDebug("<Test> End new session")
 	return nil
 }
 
@@ -110,14 +118,17 @@ func (this *SSHSession) muxShell() error {
 		ssh.TTY_OP_OSPEED: 14400, // output speed = 14.4kbaud
 	}
 	if err := this.session.RequestPty("vt100", 80, 40, modes); err != nil {
+		LogError("RequestPty error:%s", err)
 		return err
 	}
 	w, err := this.session.StdinPipe()
 	if err != nil {
+		LogError("StdinPipe() error:%s", err.Error())
 		return err
 	}
 	r, err := this.session.StdoutPipe()
 	if err != nil {
+		LogError("StdoutPipe() error:%s", err.Error())
 		return err
 	}
 
@@ -151,6 +162,7 @@ func (this *SSHSession) muxShell() error {
 		for {
 			n, err := r.Read(buf[t:])
 			if err != nil {
+				LogDebug("Reader read err:%s", err.Error())
 				return
 			}
 			t += n
@@ -214,15 +226,18 @@ func (this *SSHSession) GetSSHBrand() string {
 	if this.brand != "" {
 		return this.brand
 	}
-	//显示版本后需要多一个回车符，避免版本信息过多需要分页，导致分页指令第一个字符失效的问题
-	this.WriteChannel("dis version", "show version", "\n")
+	//显示版本后需要多一组空格，避免版本信息过多需要分页，导致分页指令第一个字符失效的问题
+	this.WriteChannel("dis version", "show version", "     ")
 	result := this.ReadChannelTiming(1)
 	result = strings.ToLower(result)
 	if strings.Contains(result, HUAWEI) {
+		LogDebug("The switch brand is <huawei>.")
 		this.brand = HUAWEI
 	} else if strings.Contains(result, H3C) {
+		LogDebug("The switch brand is <h3c>.")
 		this.brand = H3C
 	} else if strings.Contains(result, CISCO) {
+		LogDebug("The switch brand is <cisco>.")
 		this.brand = CISCO
 	}
 	return this.brand
@@ -232,18 +247,17 @@ func (this *SSHSession) GetSSHBrand() string {
  * SSHSession的关闭方法，会关闭session和输入输出管道
  * @author shenbowei
  */
-func (this *SSHSession) Close() error {
+func (this *SSHSession) Close() {
 	defer func() {
 		if err := recover(); err != nil {
 			LogError("SSHSession Close err:%s", err)
 		}
 	}()
 	if err := this.session.Close(); err != nil {
-		return err
+		LogError("Close session err:%s", err.Error())
 	}
 	close(this.in)
 	close(this.out)
-	return nil
 }
 
 /**
@@ -252,6 +266,7 @@ func (this *SSHSession) Close() error {
  * @author shenbowei
  */
 func (this *SSHSession) WriteChannel(cmds ...string) {
+	LogDebug("WriteChannel <cmds=%v>", cmds)
 	for _, cmd := range cmds {
 		this.in <- cmd
 	}
@@ -264,6 +279,7 @@ func (this *SSHSession) WriteChannel(cmds ...string) {
  * @author shenbowei
  */
 func (this *SSHSession) ReadChannelExpect(maxIntervalTime float32, expects ...string) string {
+	LogDebug("ReadChannelExpect <maxIntervalTime=%f, expect=%v>", maxIntervalTime, expects)
 	result := ""
 	isDelay := false
 ExitLoop:
@@ -278,6 +294,7 @@ ExitLoop:
 				}
 			}
 		default:
+			LogDebug("Channel is empty")
 			//如果已经延迟过了，则直接返回
 			if isDelay {
 				break ExitLoop
@@ -296,6 +313,7 @@ ExitLoop:
  * @author shenbowei
  */
 func (this *SSHSession) ReadChannelTiming(maxIntervalTime float32) string {
+	LogDebug("ReadChannelTiming <maxIntervalTime = %f>", maxIntervalTime)
 	result := ""
 	isDelay := false
 ExitLoop:
@@ -305,6 +323,7 @@ ExitLoop:
 			isDelay = false
 			result += sout
 		default:
+			LogDebug("Channel is empty")
 			//如果已经延迟过了，则直接返回
 			if isDelay {
 				break ExitLoop
