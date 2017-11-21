@@ -19,9 +19,10 @@ var sessionManager = NewSessionManager()
  * @author shenbowei
  */
 type SessionManager struct {
-	sessionCache  map[string]*SSHSession
-	sessionLocker map[string]*sync.Mutex
-	globalLocker  *sync.RWMutex
+	sessionCache           map[string]*SSHSession
+	sessionLocker          map[string]*sync.Mutex
+	sessionCacheLocker     *sync.RWMutex
+	sessionLockerMapLocker *sync.RWMutex
 }
 
 /**
@@ -33,21 +34,22 @@ func NewSessionManager() *SessionManager {
 	sessionManager := new(SessionManager)
 	sessionManager.sessionCache = make(map[string]*SSHSession, 0)
 	sessionManager.sessionLocker = make(map[string]*sync.Mutex, 0)
-	sessionManager.globalLocker = new(sync.RWMutex)
+	sessionManager.sessionCacheLocker = new(sync.RWMutex)
+	sessionManager.sessionLockerMapLocker = new(sync.RWMutex)
 	//启动自动清理的线程，清理10分钟未使用的session缓存
 	sessionManager.RunAutoClean()
 	return sessionManager
 }
 
 func (this *SessionManager) SetSessionCache(sessionKey string, session *SSHSession) {
-	this.globalLocker.Lock()
-	defer this.globalLocker.Unlock()
+	this.sessionCacheLocker.Lock()
+	defer this.sessionCacheLocker.Unlock()
 	this.sessionCache[sessionKey] = session
 }
 
 func (this *SessionManager) GetSessionCache(sessionKey string) *SSHSession {
-	this.globalLocker.RLock()
-	defer this.globalLocker.RUnlock()
+	this.sessionCacheLocker.RLock()
+	defer this.sessionCacheLocker.RUnlock()
 	cache, ok := this.sessionCache[sessionKey]
 	if ok {
 		return cache
@@ -62,15 +64,17 @@ func (this *SessionManager) GetSessionCache(sessionKey string) *SSHSession {
  * @author shenbowei
  */
 func (this *SessionManager) LockSession(sessionKey string) {
+	this.sessionLockerMapLocker.RLock()
 	mutex, ok := this.sessionLocker[sessionKey]
+	this.sessionLockerMapLocker.RUnlock()
 	if !ok {
 		//如果获取不到锁，需要创建锁，主要更新锁存的时候需要上全局锁
 		mutex = new(sync.Mutex)
-		this.globalLocker.Lock()
+		this.sessionLockerMapLocker.Lock()
 		this.sessionLocker[sessionKey] = mutex
-		this.globalLocker.Unlock()
+		this.sessionLockerMapLocker.Unlock()
 	}
-	this.sessionLocker[sessionKey].Lock()
+	mutex.Lock()
 }
 
 /**
@@ -79,7 +83,9 @@ func (this *SessionManager) LockSession(sessionKey string) {
  * @author shenbowei
  */
 func (this *SessionManager) UnlockSession(sessionKey string) {
+	this.sessionLockerMapLocker.RLock()
 	this.sessionLocker[sessionKey].Unlock()
+	this.sessionLockerMapLocker.RUnlock()
 }
 
 /**
@@ -163,14 +169,14 @@ func (this *SessionManager) RunAutoClean() {
 	go func() {
 		for {
 			timeoutSessionIndex := this.getTimeoutSessionIndex()
-			this.globalLocker.Lock()
+			this.sessionCacheLocker.Lock()
 			for _, sessionKey := range timeoutSessionIndex {
 				this.LockSession(sessionKey)
 				delete(this.sessionCache, sessionKey)
 				this.UnlockSession(sessionKey)
 			}
-			this.globalLocker.Unlock()
-			time.Sleep(time.Second)
+			this.sessionCacheLocker.Unlock()
+			time.Sleep(30 * time.Second)
 		}
 	}()
 }
@@ -182,9 +188,9 @@ func (this *SessionManager) RunAutoClean() {
  */
 func (this *SessionManager) getTimeoutSessionIndex() []string {
 	timeoutSessionIndex := make([]string, 0)
-	this.globalLocker.RLock()
+	this.sessionCacheLocker.RLock()
 	defer func() {
-		this.globalLocker.RUnlock()
+		this.sessionCacheLocker.RUnlock()
 		if err := recover(); err != nil {
 			LogError("SSHSessionManager getTimeoutSessionIndex err:%s", err)
 		}
