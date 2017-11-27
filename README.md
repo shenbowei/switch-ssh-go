@@ -5,7 +5,7 @@ and automatically clear sessions that are not used for 10 minutes.
 
 ## Installation
 
-```
+```text
 $ go get github.com/shenbowei/switch-ssh-go
 ```
 
@@ -18,7 +18,7 @@ and each session before the execution of the command verifies the availability o
 so you can call the following method repeatedly (not repeatedly connecting the device).
 
 
-```
+```go
 //get the switch brand(vendor), include h3c,huawei and cisco
 brand, err := ssh.GetSSHBrand(user, password, ipPort)
 
@@ -31,7 +31,7 @@ result, err := ssh.RunCommandsWithBrand(user, password, ipPort, ssh.CISCO, cmds.
 
 ### example
 
-```
+```go
 package main
 
 import (
