@@ -3,6 +3,7 @@ package ssh
 import (
 	"fmt"
 	"strings"
+	"time"
 )
 
 const (
@@ -28,7 +29,7 @@ func RunCommands(user, password, ipPort string, cmds ...string) (string, error) 
 		return "", err
 	}
 	sshSession.WriteChannel(cmds...)
-	result := sshSession.ReadChannelTiming(2)
+	result := sshSession.ReadChannelTiming(2 * time.Second)
 	filteredResult := filterResult(result, cmds[0])
 	return filteredResult, nil
 }
@@ -50,7 +51,7 @@ func RunCommandsWithBrand(user, password, ipPort, brand string, cmds ...string) 
 		return "", err
 	}
 	sshSession.WriteChannel(cmds...)
-	result := sshSession.ReadChannelTiming(2)
+	result := sshSession.ReadChannelTiming(2 * time.Second)
 	filteredResult := filterResult(result, cmds[0])
 	return filteredResult, nil
 }

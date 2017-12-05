@@ -186,7 +186,7 @@ func (this *SSHSession) start() error {
 		return err
 	}
 	//等待登录信息输出
-	this.ReadChannelExpect(1, "#", ">", "]")
+	this.ReadChannelExpect(time.Second, "#", ">", "]")
 	return nil
 }
 
@@ -203,7 +203,7 @@ func (this *SSHSession) CheckSelf() bool {
 	}()
 
 	this.WriteChannel("\n")
-	result := this.ReadChannelExpect(2, "#", ">", "]")
+	result := this.ReadChannelExpect(2*time.Second, "#", ">", "]")
 	if strings.Contains(result, "#") ||
 		strings.Contains(result, ">") ||
 		strings.Contains(result, "]") {
@@ -228,7 +228,7 @@ func (this *SSHSession) GetSSHBrand() string {
 	}
 	//显示版本后需要多一组空格，避免版本信息过多需要分页，导致分页指令第一个字符失效的问题
 	this.WriteChannel("dis version", "show version", "     ")
-	result := this.ReadChannelTiming(1)
+	result := this.ReadChannelTiming(time.Second)
 	result = strings.ToLower(result)
 	if strings.Contains(result, HUAWEI) {
 		LogDebug("The switch brand is <huawei>.")
@@ -274,64 +274,70 @@ func (this *SSHSession) WriteChannel(cmds ...string) {
 
 /**
  * 从输出管道中读取设备返回的执行结果，若输出流间隔超过maxIntervalTime或者包含expects中的字符便会返回
- * @param maxIntervalTime 输出管道的最大时间, expects...:期望得到的字符（可多个），得到便返回
+ * @param timeout 从设备读取不到数据时的超时等待时间（超过超时等待时间即认为设备的响应内容已经被完全读取）, expects...:期望得到的字符（可多个），得到便返回
  * @return 从输出管道读出的返回结果
  * @author shenbowei
  */
-func (this *SSHSession) ReadChannelExpect(maxIntervalTime float32, expects ...string) string {
-	LogDebug("ReadChannelExpect <maxIntervalTime=%f, expect=%v>", maxIntervalTime, expects)
-	result := ""
+func (this *SSHSession) ReadChannelExpect(timeout time.Duration, expects ...string) string {
+	LogDebug("ReadChannelExpect <wait timeout = %d>", timeout/time.Millisecond)
+	switchResponse := ""
 	isDelay := false
 ExitLoop:
-	for {
+	//最多从设备读取600*100ms=60s，避免方法无法返回
+	for i := 0; i < 600; i++ {
+		//每次睡眠0.1秒，使out管道中的数据能积累一段时间，避免过早触发default等待退出
+		time.Sleep(time.Millisecond * 100)
 		select {
-		case sout := <-this.out:
+		case output := <-this.out:
 			isDelay = false
-			result = result + sout
+			switchResponse = switchResponse + output
 			for _, expect := range expects {
-				if strings.Contains(sout, expect) {
+				if strings.Contains(output, expect) {
 					break ExitLoop
 				}
 			}
 		default:
-			LogDebug("Channel is empty")
+			LogDebug("ReadChannelExpect: Channel is empty")
 			//如果已经延迟过了，则直接返回
 			if isDelay {
 				break ExitLoop
 			}
-			time.Sleep(time.Duration(maxIntervalTime) * time.Second)
+			time.Sleep(timeout)
 			isDelay = true
 		}
 	}
-	return result
+	return switchResponse
 }
 
 /**
  * 从输出管道中读取设备返回的执行结果，若输出流间隔超过maxIntervalTime便会返回
- * @param maxIntervalTime 输出管道的最大时间
+ * @param timeout 从设备读取不到数据时的超时等待时间（超过超时等待时间即认为设备的响应内容已经被完全读取）
  * @return 从输出管道读出的返回结果
  * @author shenbowei
  */
-func (this *SSHSession) ReadChannelTiming(maxIntervalTime float32) string {
-	LogDebug("ReadChannelTiming <maxIntervalTime = %f>", maxIntervalTime)
-	result := ""
-	isDelay := false
+func (this *SSHSession) ReadChannelTiming(timeout time.Duration) string {
+	LogDebug("ReadChannelTiming <wait timeout = %d>", timeout/time.Millisecond)
+	switchResponse := ""
+	isDelayed := false
 ExitLoop:
-	for {
+	//最多从设备读取600*100ms=60s，避免方法无法返回
+	for i := 0; i < 600; i++ {
+		//每次睡眠0.1秒，使out管道中的数据能积累一段时间，避免过早触发default等待退出
+		time.Sleep(time.Millisecond * 100)
 		select {
-		case sout := <-this.out:
-			isDelay = false
-			result += sout
+		case output := <-this.out:
+			isDelayed = false
+			switchResponse += output
+			LogDebug("read: %s", output)
 		default:
-			LogDebug("Channel is empty")
+			LogDebug("ReadChannelTiming: Channel is empty")
 			//如果已经延迟过了，则直接返回
-			if isDelay {
+			if isDelayed {
 				break ExitLoop
 			}
-			time.Sleep(time.Duration(maxIntervalTime) * time.Second)
-			isDelay = true
+			time.Sleep(timeout)
+			isDelayed = true
 		}
 	}
-
-	return result
+	return switchResponse
 }

@@ -131,7 +131,7 @@ func (this *SessionManager) initSession(session *SSHSession, brand string) {
 	default:
 		return
 	}
-	session.ReadChannelExpect(1, "#", ">", "]")
+	session.ReadChannelExpect(time.Second, "#", ">", "]")
 }
 
 /**
