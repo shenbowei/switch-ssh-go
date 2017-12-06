@@ -132,8 +132,8 @@ func (this *SSHSession) muxShell() error {
 		return err
 	}
 
-	in := make(chan string, 0)
-	out := make(chan string, 0)
+	in := make(chan string, 1024)
+	out := make(chan string, 1024)
 	go func() {
 		defer func() {
 			if err := recover(); err != nil {
