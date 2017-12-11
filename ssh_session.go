@@ -273,71 +273,100 @@ func (this *SSHSession) WriteChannel(cmds ...string) {
 }
 
 /**
- * 从输出管道中读取设备返回的执行结果，若输出流间隔超过maxIntervalTime或者包含expects中的字符便会返回
+ * 从输出管道中读取设备返回的执行结果，若输出流间隔超过timeout或者包含expects中的字符便会返回
  * @param timeout 从设备读取不到数据时的超时等待时间（超过超时等待时间即认为设备的响应内容已经被完全读取）, expects...:期望得到的字符（可多个），得到便返回
  * @return 从输出管道读出的返回结果
  * @author shenbowei
  */
 func (this *SSHSession) ReadChannelExpect(timeout time.Duration, expects ...string) string {
 	LogDebug("ReadChannelExpect <wait timeout = %d>", timeout/time.Millisecond)
-	switchResponse := ""
-	isDelay := false
-ExitLoop:
-	//最多从设备读取600*100ms=60s，避免方法无法返回
-	for i := 0; i < 600; i++ {
-		//每次睡眠0.1秒，使out管道中的数据能积累一段时间，避免过早触发default等待退出
-		time.Sleep(time.Millisecond * 100)
-		select {
-		case output := <-this.out:
-			isDelay = false
-			switchResponse = switchResponse + output
-			for _, expect := range expects {
-				if strings.Contains(output, expect) {
-					break ExitLoop
-				}
+	output := ""
+	isDelayed := false
+	for i := 0; i < 300; i++ { //最多从设备读取300次，避免方法无法返回
+		time.Sleep(time.Millisecond * 100) //每次睡眠0.1秒，使out管道中的数据能积累一段时间，避免过早触发default等待退出
+		newData := this.readChannelData()
+		LogDebug("ReadChannelExpect: read chanel buffer: %s", newData)
+		if newData != "" {
+			output += newData
+			isDelayed = false
+			continue
+		}
+		for _, expect := range expects {
+			if strings.Contains(output, expect) {
+				return output
 			}
-		default:
-			LogDebug("ReadChannelExpect: Channel is empty")
-			//如果已经延迟过了，则直接返回
-			if isDelay {
-				break ExitLoop
-			}
+		}
+		//如果之前已经等待过一次，则直接退出，否则就等待一次超时再重新读取内容
+		if !isDelayed {
+			LogDebug("ReadChannelExpect: delay for timeout")
 			time.Sleep(timeout)
-			isDelay = true
+			isDelayed = true
+		} else {
+			return output
 		}
 	}
-	return switchResponse
+	return output
 }
 
 /**
- * 从输出管道中读取设备返回的执行结果，若输出流间隔超过maxIntervalTime便会返回
+ * 从输出管道中读取设备返回的执行结果，若输出流间隔超过timeout便会返回
  * @param timeout 从设备读取不到数据时的超时等待时间（超过超时等待时间即认为设备的响应内容已经被完全读取）
  * @return 从输出管道读出的返回结果
  * @author shenbowei
  */
 func (this *SSHSession) ReadChannelTiming(timeout time.Duration) string {
 	LogDebug("ReadChannelTiming <wait timeout = %d>", timeout/time.Millisecond)
-	switchResponse := ""
+	output := ""
 	isDelayed := false
-ExitLoop:
-	//最多从设备读取600*100ms=60s，避免方法无法返回
-	for i := 0; i < 600; i++ {
-		//每次睡眠0.1秒，使out管道中的数据能积累一段时间，避免过早触发default等待退出
-		time.Sleep(time.Millisecond * 100)
-		select {
-		case output := <-this.out:
+
+	for i := 0; i < 300; i++ { //最多从设备读取300次，避免方法无法返回
+		time.Sleep(time.Millisecond * 100) //每次睡眠0.1秒，使out管道中的数据能积累一段时间，避免过早触发default等待退出
+		newData := this.readChannelData()
+		LogDebug("ReadChannelTiming: read chanel buffer: %s", newData)
+		if newData != "" {
+			output += newData
 			isDelayed = false
-			switchResponse += output
-			LogDebug("read: %s", output)
-		default:
-			LogDebug("ReadChannelTiming: Channel is empty")
-			//如果已经延迟过了，则直接返回
-			if isDelayed {
-				break ExitLoop
-			}
+			continue
+		}
+		//如果之前已经等待过一次，则直接退出，否则就等待一次超时再重新读取内容
+		if !isDelayed {
+			LogDebug("ReadChannelTiming: delay for timeout.")
 			time.Sleep(timeout)
 			isDelayed = true
+		} else {
+			return output
 		}
 	}
-	return switchResponse
+	return output
+}
+
+/**
+ * 清除管道缓存的内容，避免管道中上次未读取的残余内容影响下次的结果
+ * @param
+ * @author duhaifeng
+ */
+func (this *SSHSession) ClearChannel() {
+	time.Sleep(time.Millisecond * 100)
+	this.readChannelData()
+}
+
+/**
+ * 清除管道缓存的内容，避免管道中上次未读取的残余内容影响下次的结果
+ * @param
+ * @author duhaifeng
+ */
+func (this *SSHSession) readChannelData() string {
+	output := ""
+	for {
+		select {
+		case channelData, ok := <-this.out:
+			if !ok {
+				//如果out管道已经被关闭，则停止读取，否则<-this.out会进入无限循环
+				return output
+			}
+			output += channelData
+		default:
+			return output
+		}
+	}
 }
