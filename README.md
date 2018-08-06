@@ -1,6 +1,6 @@
 # switch-ssh-go
-A packaged SSH library for switches (huawei,h3c,cisco).
-A session pool is implemented to avoid repeated connection devices 
+A packaged SSH library for switches (huawei,h3c,cisco,nos).
+A session pool is implemented to avoid repeated connection devices
 and automatically clear sessions that are not used for 10 minutes.
 
 ## Installation
@@ -13,8 +13,8 @@ $ go get github.com/shenbowei/switch-ssh-go
 
 ### In Code
 
-switch-ssh-go implemented a connection pool to save the session, 
-and each session before the execution of the command verifies the availability of the session, 
+switch-ssh-go implemented a connection pool to save the session,
+and each session before the execution of the command verifies the availability of the session,
 so you can call the following method repeatedly (not repeatedly connecting the device).
 
 
@@ -66,4 +66,4 @@ func main() {
 
 ## Licenses
 
-switch-ssh-go is released under the MIT License. 
+switch-ssh-go is released under the MIT License.
