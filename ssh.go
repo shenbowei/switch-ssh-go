@@ -10,6 +10,7 @@ const (
 	HUAWEI = "huawei"
 	H3C    = "h3c"
 	CISCO  = "cisco"
+	NOS    = "NOS"
 )
 
 /**
