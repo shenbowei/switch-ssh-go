@@ -342,22 +342,19 @@ func (this *SSHSession) ReadChannelTiming(timeout time.Duration) string {
 
 /**
  * 清除管道缓存的内容，避免管道中上次未读取的残余内容影响下次的结果
- * @param
- * @author duhaifeng
  */
 func (this *SSHSession) ClearChannel() {
-	time.Sleep(time.Millisecond * 100)
+	//time.Sleep(time.Millisecond * 100)
 	this.readChannelData()
 }
 
 /**
  * 清除管道缓存的内容，避免管道中上次未读取的残余内容影响下次的结果
- * @param
- * @author duhaifeng
  */
 func (this *SSHSession) readChannelData() string {
 	output := ""
 	for {
+		time.Sleep(time.Millisecond * 100)
 		select {
 		case channelData, ok := <-this.out:
 			if !ok {
