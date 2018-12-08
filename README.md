@@ -14,7 +14,7 @@ $ go get github.com/shenbowei/switch-ssh-go
 ### In Code
 
 switch-ssh-go implemented a connection pool to save the session, 
-and each session before the execution of the command verifies the availability of the session, 
+and each session verifies its availability before executing the commands,
 so you can call the following method repeatedly (not repeatedly connecting the device).
 
 
