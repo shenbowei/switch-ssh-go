@@ -1,9 +1,9 @@
 package ssh
 
 import (
+	"fmt"
 	"testing"
 	"time"
-    "fmt"
 )
 
 func TestSSHRunner(t *testing.T) {
@@ -16,7 +16,7 @@ func TestSSHRunner(t *testing.T) {
 	cmds = append(cmds, "dis clock")
 	cmds = append(cmds, "dis clock")
 
-    Debug = false
+	Debug = false
 	result, err := RunCommandsWithBrand(user, password, ipPort, H3C, cmds...)
 	if err != nil {
 		LogError("RunCommands err:%s", err.Error())
@@ -29,7 +29,7 @@ func TestSSHRunner(t *testing.T) {
 	if err != nil {
 		LogError("RunCommands err:%s", err.Error())
 	}
-    fmt.Printf("RunCommands result2:\n%s", result2)
+	fmt.Printf("RunCommands result2:\n%s", result2)
 	time.Sleep(time.Second)
 }
 

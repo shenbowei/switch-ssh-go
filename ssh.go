@@ -112,9 +112,9 @@ func filterResult(result, firstCmd string) string {
 }
 
 func LogDebug(format string, a ...interface{}) {
-    if Debug {
-        fmt.Println("[DEBUG]:" + fmt.Sprintf(format, a...))
-    }
+	if Debug {
+		fmt.Println("[DEBUG]:" + fmt.Sprintf(format, a...))
+	}
 }
 
 func LogError(format string, a ...interface{}) {
