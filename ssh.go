@@ -12,6 +12,8 @@ const (
 	CISCO  = "cisco"
 )
 
+var Debug = true
+
 /**
  * 外部调用的统一方法，完成获取会话（若不存在，则会创建连接和会话，并存放入缓存），执行指令的流程，返回执行结果
  * @param user ssh连接的用户名, password 密码, ipPort 交换机的ip和端口, cmds 执行的指令(可以多个)
@@ -110,7 +112,9 @@ func filterResult(result, firstCmd string) string {
 }
 
 func LogDebug(format string, a ...interface{}) {
-	fmt.Println("[DEBUG]:" + fmt.Sprintf(format, a...))
+    if Debug {
+        fmt.Println("[DEBUG]:" + fmt.Sprintf(format, a...))
+    }
 }
 
 func LogError(format string, a ...interface{}) {
