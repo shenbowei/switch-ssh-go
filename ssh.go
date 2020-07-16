@@ -12,7 +12,7 @@ const (
 	CISCO  = "cisco"
 )
 
-var Debug = true
+var IsLogDebug = true
 
 /**
  * 外部调用的统一方法，完成获取会话（若不存在，则会创建连接和会话，并存放入缓存），执行指令的流程，返回执行结果
@@ -112,7 +112,7 @@ func filterResult(result, firstCmd string) string {
 }
 
 func LogDebug(format string, a ...interface{}) {
-	if Debug {
+	if IsLogDebug {
 		fmt.Println("[DEBUG]:" + fmt.Sprintf(format, a...))
 	}
 }

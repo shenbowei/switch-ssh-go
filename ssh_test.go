@@ -16,7 +16,7 @@ func TestSSHRunner(t *testing.T) {
 	cmds = append(cmds, "dis clock")
 	cmds = append(cmds, "dis clock")
 
-	Debug = false
+	IsLogDebug = false
 	result, err := RunCommandsWithBrand(user, password, ipPort, H3C, cmds...)
 	if err != nil {
 		LogError("RunCommands err:%s", err.Error())
