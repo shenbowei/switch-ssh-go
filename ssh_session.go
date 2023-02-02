@@ -26,9 +26,9 @@ type SSHSession struct {
  * @return 打开的SSHSession，执行的错误
  * @author shenbowei
  */
-func NewSSHSession(user, password, ipPort string) (*SSHSession, error) {
+func NewSSHSession(user, ipPort string) (*SSHSession, error) {
 	sshSession := new(SSHSession)
-	if err := sshSession.createConnection(user, password, ipPort); err != nil {
+	if err := sshSession.createConnection(user, ipPort); err != nil {
 		LogError("NewSSHSession createConnection error:%s", err.Error())
 		return nil, err
 	}
@@ -68,13 +68,11 @@ func (this *SSHSession) UpdateLastUseTime() {
  * @return 执行的错误
  * @author shenbowei
  */
-func (this *SSHSession) createConnection(user, password, ipPort string) error {
+func (this *SSHSession) createConnection(user, ipPort string) error {
 	LogDebug("<Test> Begin connect")
 	client, err := ssh.Dial("tcp", ipPort, &ssh.ClientConfig{
 		User: user,
-		Auth: []ssh.AuthMethod{
-			ssh.Password(password),
-		},
+		Auth: []ssh.noneAuth{},
 		HostKeyCallback: func(hostname string, remote net.Addr, key ssh.PublicKey) error {
 			return nil
 		},
